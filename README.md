@@ -45,6 +45,7 @@ Copy `.env.example` to `.env` if you want to change those paths.
 ## Development
 
 ```bash
+npm run db:seed     # fill an empty database with 18 classic albums and generated covers
 npm test            # unit tests (Vitest)
 npm run lint        # ESLint
 npm run typecheck   # Next.js route types + tsc
@@ -80,6 +81,7 @@ src/
   components/          shared UI
   db/                  Drizzle schema and SQLite client (runs migrations)
   lib/                 domain logic and helpers, with tests next to them
+scripts/               seed script
 drizzle/               generated SQL migrations
 data/                  local database and covers (git-ignored)
 ```
