@@ -12,8 +12,9 @@ You can clone it and have it running in under a minute.
 - Add an album with series, number, publisher, year, ISBN and a cover image
 - Browse your shelf, cover-first
 - Search across series, title, publisher and ISBN
+- Open an album, edit every field, replace the cover, or delete it
 
-That is the whole v0.1. See the [roadmap](#roadmap) for what comes next.
+See the [roadmap](#roadmap) for what comes next.
 
 ## Stack
 
@@ -72,7 +73,9 @@ getting in the way of adding your first album.
 ```
 src/
   app/                 routes, server actions, layout
-    albums/new/        add-album form and its server action
+    albums/            shared album form and server actions (create, update, delete)
+    albums/new/        add an album
+    albums/[slug]/     album detail page, with edit/ below it
     covers/[file]/     serves uploaded cover images
   components/          shared UI
   db/                  Drizzle schema and SQLite client (runs migrations)
@@ -83,14 +86,15 @@ data/                  local database and covers (git-ignored)
 
 ## Roadmap
 
-Tracked as GitHub issues. Rough order:
+Tracked as [GitHub issues](https://github.com/yannickdesiron/comic-shelf/issues) under the
+[v0.2 milestone](https://github.com/yannickdesiron/comic-shelf/milestone/1). Rough order:
 
-1. Album detail page, edit and delete
-2. Read status toggle from the shelf
-3. Filters: language, format, read status
-4. ISBN lookup to prefill metadata
-5. Barcode scanning on mobile
-6. Dutch and English UI toggle
+1. ~~Album detail page, edit and delete~~ (#1)
+2. Read status toggle from the shelf (#2)
+3. Filters: language, format, read status (#3)
+4. ISBN lookup to prefill metadata (#4)
+5. Barcode scanning on mobile (#5)
+6. Dutch and English UI toggle (#6)
 
 ## License
 
