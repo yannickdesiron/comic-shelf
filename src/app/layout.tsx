@@ -21,12 +21,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/" className="text-lg font-semibold tracking-tight">
               Comic <span className="text-accent">Shelf</span>
             </Link>
+            <nav className="flex items-center gap-4">
+            <Link href="/import" className="text-sm text-muted hover:text-ink">
+              Importeren
+            </Link>
             <Link
               href="/albums/new"
               className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
             >
               Album toevoegen
             </Link>
+            </nav>
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">{children}</main>
