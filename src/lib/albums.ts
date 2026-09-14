@@ -1,4 +1,4 @@
-import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, exists, isNull, like, not, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Db } from "@/db/client";
@@ -25,6 +25,9 @@ const optionalInt = z
     return t.length === 0 ? null : Number(t);
   });
 
+export const READ_STATUSES = ["unread", "reading", "read"] as const;
+export type ReadStatus = (typeof READ_STATUSES)[number];
+
 /** Validated shape of the "add album" form. */
 export const newAlbumSchema = z.object({
   seriesTitle: z.string().trim().min(1, "Reeks is verplicht"),
@@ -47,8 +50,10 @@ export const newAlbumSchema = z.object({
     }),
   language: z.enum(["nl", "fr", "en"]).default("nl"),
   format: z.enum(["softcover", "hardcover", "digital"]).default("softcover"),
+  readStatus: z.enum(READ_STATUSES).default("unread"),
+  /** "yes" creates a copy; "no" records the album as wanted. */
+  owned: z.enum(["yes", "no"]).default("yes"),
   kind: z.enum(["physical", "digital"]).default("physical"),
-  readStatus: z.enum(["unread", "reading", "read"]).default("unread"),
   location: optionalText,
   notes: optionalText,
   coverFile: z.string().nullable().optional().default(null),
@@ -61,24 +66,21 @@ export type NewAlbum = z.output<typeof newAlbumSchema>;
 
 /**
  * Creates the series (when it does not exist yet), the album, one edition
- * and one owned copy in a single transaction. Returns the album slug.
+ * and, when owned, one copy, in a single transaction. Returns the album slug.
  */
 export function createAlbum(db: Db, input: NewAlbum): { albumId: number; slug: string } {
   return db.transaction((tx) => {
-    const seriesSlug = slugify(input.seriesTitle);
-    let seriesRow = tx.select().from(series).where(eq(series.slug, seriesSlug)).get();
-    if (!seriesRow) {
-      seriesRow = tx
-        .insert(series)
-        .values({ title: input.seriesTitle, slug: seriesSlug })
-        .returning()
-        .get();
-    }
-
-    const albumSlug = uniqueAlbumSlug(tx, seriesSlug, input.number, input.title);
+    const seriesRow = findOrCreateSeries(tx, input.seriesTitle);
+    const albumSlug = uniqueAlbumSlug(tx, seriesRow.slug, input.number, input.title);
     const albumRow = tx
       .insert(albums)
-      .values({ seriesId: seriesRow.id, title: input.title, number: input.number, slug: albumSlug })
+      .values({
+        seriesId: seriesRow.id,
+        title: input.title,
+        number: input.number,
+        slug: albumSlug,
+        readStatus: input.readStatus,
+      })
       .returning()
       .get();
 
@@ -96,18 +98,22 @@ export function createAlbum(db: Db, input: NewAlbum): { albumId: number; slug: s
       .returning()
       .get();
 
-    tx.insert(copies)
-      .values({
-        editionId: editionRow.id,
-        kind: input.kind,
-        readStatus: input.readStatus,
-        location: input.location,
-        notes: input.notes,
-      })
-      .run();
+    if (input.owned === "yes") {
+      tx.insert(copies)
+        .values({ editionId: editionRow.id, kind: input.kind, location: input.location, notes: input.notes })
+        .run();
+    }
 
     return { albumId: albumRow.id, slug: albumSlug };
   });
+}
+
+function findOrCreateSeries(db: Tx, title: string): Series {
+  const slug = slugify(title);
+  return (
+    db.select().from(series).where(eq(series.slug, slug)).get() ??
+    db.insert(series).values({ title, slug }).returning().get()
+  );
 }
 
 function uniqueAlbumSlug(db: Tx, seriesSlug: string, number: number | null, title: string) {
@@ -130,19 +136,40 @@ export type ShelfAlbum = {
   publisher: string | null;
   year: number | null;
   coverFile: string | null;
-  readStatus: string;
+  readStatus: ReadStatus;
+  owned: boolean;
   createdAt: Date;
 };
 
-/**
- * Lists albums for the shelf, newest first. A query matches series title,
- * album title, publisher or ISBN (case-insensitive substring).
- */
-export function listAlbums(db: Db, query = ""): ShelfAlbum[] {
-  const q = query.trim();
+export type ShelfFilters = {
+  /** Text query across series, title, publisher, ISBN. */
+  q?: string;
+  owned?: "yes" | "no";
+  readStatus?: ReadStatus;
+};
+
+/** Lists albums for the shelf, newest first, narrowed by the given filters. */
+export function listAlbums(db: Db, filters: ShelfFilters | string = {}): ShelfAlbum[] {
+  const f = typeof filters === "string" ? { q: filters } : filters;
+  const q = f.q?.trim() ?? "";
   const pattern = `%${q}%`;
 
-  const rows = db
+  const hasCopy = exists(db.select({ id: copies.id }).from(copies).where(eq(copies.editionId, editions.id)));
+
+  const conditions = [
+    q.length > 0
+      ? or(
+          like(series.title, pattern),
+          like(albums.title, pattern),
+          like(editions.publisher, pattern),
+          like(editions.isbn, pattern),
+        )
+      : undefined,
+    f.owned === "yes" ? hasCopy : f.owned === "no" ? not(hasCopy) : undefined,
+    f.readStatus ? eq(albums.readStatus, f.readStatus) : undefined,
+  ].filter((c) => c !== undefined);
+
+  return db
     .select({
       id: albums.id,
       slug: albums.slug,
@@ -152,37 +179,24 @@ export function listAlbums(db: Db, query = ""): ShelfAlbum[] {
       publisher: editions.publisher,
       year: editions.year,
       coverFile: editions.coverFile,
-      readStatus: sql<string>`coalesce(min(${copies.readStatus}), 'unread')`,
+      readStatus: albums.readStatus,
+      owned: sql<number>`${hasCopy}`.mapWith(Boolean),
       createdAt: albums.createdAt,
     })
     .from(albums)
     .innerJoin(series, eq(series.id, albums.seriesId))
     .innerJoin(editions, eq(editions.albumId, albums.id))
-    .leftJoin(copies, eq(copies.editionId, editions.id))
-    .where(
-      q.length === 0
-        ? undefined
-        : and(
-            or(
-              like(series.title, pattern),
-              like(albums.title, pattern),
-              like(editions.publisher, pattern),
-              like(editions.isbn, pattern),
-            ),
-          ),
-    )
-    .groupBy(albums.id, editions.id)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .groupBy(albums.id)
     .orderBy(desc(albums.createdAt), desc(albums.id))
     .all();
-
-  return rows;
 }
-
 
 export type AlbumDetail = {
   album: Album;
   series: Series;
   edition: Edition;
+  /** null when the album is wanted rather than owned. */
   copy: Copy | null;
 };
 
@@ -203,26 +217,20 @@ export function getAlbum(db: Db, slug: string): AlbumDetail | null {
 /**
  * Updates an existing album, its edition and its copy. Moving the album to a
  * different series creates that series when needed and removes the old one
- * when it is left empty. The slug stays stable so links keep working.
- * Returns the previous cover file when the cover changed, so the caller can
- * delete it from disk.
+ * when it is left empty. Switching `owned` creates or removes the copy. The
+ * slug stays stable so links keep working. Returns the previous cover file
+ * when the cover changed, so the caller can delete it from disk.
  */
 export function updateAlbum(db: Db, albumId: number, input: NewAlbum): { previousCover: string | null } {
   return db.transaction((tx) => {
     const current = tx.select().from(albums).where(eq(albums.id, albumId)).get();
     if (!current) throw new Error(`Album ${albumId} not found`);
 
-    const seriesSlug = slugify(input.seriesTitle);
-    let seriesRow = tx.select().from(series).where(eq(series.slug, seriesSlug)).get();
-    if (!seriesRow) {
-      seriesRow = tx.insert(series).values({ title: input.seriesTitle, slug: seriesSlug }).returning().get();
-    }
-
+    const seriesRow = findOrCreateSeries(tx, input.seriesTitle);
     tx.update(albums)
-      .set({ seriesId: seriesRow.id, title: input.title, number: input.number })
+      .set({ seriesId: seriesRow.id, title: input.title, number: input.number, readStatus: input.readStatus })
       .where(eq(albums.id, albumId))
       .run();
-
     if (seriesRow.id !== current.seriesId) deleteSeriesIfEmpty(tx, current.seriesId);
 
     const edition = tx.select().from(editions).where(eq(editions.albumId, albumId)).get();
@@ -241,20 +249,32 @@ export function updateAlbum(db: Db, albumId: number, input: NewAlbum): { previou
       .where(eq(editions.id, edition.id))
       .run();
 
-    const copyValues = {
-      kind: input.kind,
-      readStatus: input.readStatus,
-      location: input.location,
-      notes: input.notes,
-    };
     const copy = tx.select().from(copies).where(eq(copies.editionId, edition.id)).get();
-    if (copy) {
-      tx.update(copies).set(copyValues).where(eq(copies.id, copy.id)).run();
+    if (input.owned === "no") {
+      if (copy) tx.delete(copies).where(eq(copies.editionId, edition.id)).run();
     } else {
-      tx.insert(copies).values({ editionId: edition.id, ...copyValues }).run();
+      const copyValues = { kind: input.kind, location: input.location, notes: input.notes };
+      if (copy) tx.update(copies).set(copyValues).where(eq(copies.id, copy.id)).run();
+      else tx.insert(copies).values({ editionId: edition.id, ...copyValues }).run();
     }
 
     return { previousCover: coverChanged ? edition.coverFile : null };
+  });
+}
+
+/** Marks the story as unread, reading or read. */
+export function setReadStatus(db: Db, albumId: number, readStatus: ReadStatus): void {
+  db.update(albums).set({ readStatus }).where(eq(albums.id, albumId)).run();
+}
+
+/** Turns a wanted album into an owned one (creates a copy) or back (removes copies). */
+export function setOwned(db: Db, albumId: number, owned: boolean): void {
+  db.transaction((tx) => {
+    const edition = tx.select({ id: editions.id }).from(editions).where(eq(editions.albumId, albumId)).get();
+    if (!edition) throw new Error(`Album ${albumId} has no edition`);
+    const copy = tx.select({ id: copies.id }).from(copies).where(eq(copies.editionId, edition.id)).get();
+    if (owned && !copy) tx.insert(copies).values({ editionId: edition.id }).run();
+    if (!owned && copy) tx.delete(copies).where(eq(copies.editionId, edition.id)).run();
   });
 }
 
@@ -271,10 +291,9 @@ export function deleteAlbum(db: Db, albumId: number): { coverFiles: string[] } {
     const coverFiles = tx
       .select({ coverFile: editions.coverFile })
       .from(editions)
-      .where(eq(editions.albumId, albumId))
+      .where(and(eq(editions.albumId, albumId), not(isNull(editions.coverFile))))
       .all()
-      .map((e) => e.coverFile)
-      .filter((f): f is string => f !== null);
+      .map((e) => e.coverFile as string);
 
     tx.delete(albums).where(eq(albums.id, albumId)).run();
     deleteSeriesIfEmpty(tx, current.seriesId);

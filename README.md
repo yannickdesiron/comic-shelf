@@ -13,6 +13,8 @@ You can clone it and have it running in under a minute.
 - Browse your shelf, cover-first
 - Search across series, title, publisher and ISBN
 - Open an album, edit every field, replace the cover, or delete it
+- Mark albums as owned or wanted, and track read status per story; toggle both without opening the edit form
+- Filter the shelf on ownership and read status, combined with the search
 - Import many albums at once from Excel or CSV, or by pasting rows from a spreadsheet, with a validation preview before anything is saved
 
 See the [roadmap](#roadmap) for what comes next.
@@ -66,10 +68,12 @@ series  1 ─── n  albums  1 ─── n  editions  1 ─── n  copies
 - A **series** is a comic series ("Suske en Wiske").
 - An **album** is one story in that series, usually numbered.
 - An **edition** is a specific printing: publisher, year, ISBN, cover.
-- A **copy** is what you actually own: physical or digital, where it lives, whether you have read it.
+- A **copy** is what you actually own: physical or digital, and where it lives.
 
-Four tables is enough to model reprints and duplicate copies without
-getting in the way of adding your first album.
+An album without a copy is one you *want* but do not have. Read status
+lives on the album, because you can have read a story without owning it.
+Four tables is enough to model reprints, wanted albums and duplicate copies
+without getting in the way of adding your first album.
 
 ## Project layout
 
@@ -96,12 +100,13 @@ Tracked as [GitHub issues](https://github.com/yannickdesiron/comic-shelf/issues)
 [v0.2 milestone](https://github.com/yannickdesiron/comic-shelf/milestone/1). Rough order:
 
 1. ~~Album detail page, edit and delete~~ (#1)
-2. Read status toggle from the shelf (#2)
+2. ~~Ownership and read status~~ (#2)
 3. Filters: language, format, read status (#3)
 4. ISBN lookup to prefill metadata (#4)
 5. Barcode scanning on mobile (#5)
 6. Dutch and English UI toggle (#6)
 7. ~~Import from Excel or CSV~~ (#8)
+8. Custom lists (#10)
 
 ## License
 

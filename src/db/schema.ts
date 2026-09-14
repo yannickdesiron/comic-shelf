@@ -10,6 +10,7 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
  * - An *album* is a story in that series, usually numbered.
  * - An *edition* is one specific printing of an album (publisher, year, ISBN, cover).
  * - A *copy* is the thing you actually own: a physical book or a digital file.
+ *   An album without copies is one you want but do not have yet.
  */
 
 const timestamps = {
@@ -39,6 +40,10 @@ export const albums = sqliteTable(
     title: text("title").notNull(),
     number: integer("number"),
     slug: text("slug").notNull().unique(),
+    /** Whether you have read this story. Independent of owning a copy. */
+    readStatus: text("read_status", { enum: ["unread", "reading", "read"] })
+      .notNull()
+      .default("unread"),
     ...timestamps,
   },
   (t) => [index("albums_series_idx").on(t.seriesId), index("albums_title_idx").on(t.title)],
@@ -72,9 +77,6 @@ export const copies = sqliteTable(
       .notNull()
       .references(() => editions.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: ["physical", "digital"] }).notNull().default("physical"),
-    readStatus: text("read_status", { enum: ["unread", "reading", "read"] })
-      .notNull()
-      .default("unread"),
     location: text("location"),
     notes: text("notes"),
     ...timestamps,
