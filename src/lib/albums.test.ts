@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createDb, type Db } from "@/db/client";
-import { createAlbum, deleteAlbum, getAlbum, listAlbums, newAlbumSchema, updateAlbum } from "./albums";
-import { series } from "@/db/schema";
+import { createAlbum, deleteAlbum, getAlbum, listAlbums, newAlbumSchema, setOwned, setReadStatus, updateAlbum } from "./albums";
+import { copies, series } from "@/db/schema";
 
 let db: Db;
 
@@ -107,7 +107,8 @@ describe("getAlbum", () => {
     expect(detail?.series.title).toBe("Suske en Wiske");
     expect(detail?.album.number).toBe(67);
     expect(detail?.edition.isbn).toBe("9789002254666");
-    expect(detail?.copy?.readStatus).toBe("unread");
+    expect(detail?.album.readStatus).toBe("unread");
+    expect(detail?.copy).not.toBeNull();
   });
 
   it("returns null for an unknown slug", () => {
@@ -134,9 +135,9 @@ describe("updateAlbum", () => {
       }),
     );
     const detail = getAlbum(db, slug);
-    expect(detail?.album.title).toBe("De Texasrakkers (herdruk)");
+    expect(detail?.album).toMatchObject({ title: "De Texasrakkers (herdruk)", readStatus: "read" });
     expect(detail?.edition).toMatchObject({ publisher: "WPG", year: 2010, isbn: null, format: "hardcover" });
-    expect(detail?.copy).toMatchObject({ readStatus: "read", location: "Plank 3" });
+    expect(detail?.copy).toMatchObject({ location: "Plank 3" });
   });
 
   it("moves the album to a new series and removes the emptied one", () => {
@@ -175,5 +176,61 @@ describe("deleteAlbum", () => {
 
   it("is a no-op for an unknown id", () => {
     expect(deleteAlbum(db, 999)).toEqual({ coverFiles: [] });
+  });
+});
+
+describe("ownership", () => {
+  it("creates no copy for a wanted album, and reports it on the shelf", () => {
+    const { slug } = createAlbum(db, newAlbumSchema.parse({ ...rawTexasrakkers, owned: "no" }));
+    expect(getAlbum(db, slug)?.copy).toBeNull();
+    expect(listAlbums(db)[0].owned).toBe(false);
+  });
+
+  it("switches between owned and wanted through updateAlbum", () => {
+    const { albumId, slug } = createAlbum(db, texasrakkers);
+    updateAlbum(db, albumId, { ...texasrakkers, owned: "no" });
+    expect(getAlbum(db, slug)?.copy).toBeNull();
+    updateAlbum(db, albumId, { ...texasrakkers, location: "Plank 9" });
+    expect(getAlbum(db, slug)?.copy).toMatchObject({ location: "Plank 9" });
+  });
+
+  it("setOwned creates or removes the copy and is idempotent", () => {
+    const { albumId, slug } = createAlbum(db, newAlbumSchema.parse({ ...rawTexasrakkers, owned: "no" }));
+    setOwned(db, albumId, true);
+    setOwned(db, albumId, true);
+    expect(getAlbum(db, slug)?.copy).not.toBeNull();
+    expect(db.select().from(copies).all()).toHaveLength(1);
+    setOwned(db, albumId, false);
+    expect(getAlbum(db, slug)?.copy).toBeNull();
+  });
+
+  it("setReadStatus updates the album", () => {
+    const { albumId, slug } = createAlbum(db, texasrakkers);
+    setReadStatus(db, albumId, "reading");
+    expect(getAlbum(db, slug)?.album.readStatus).toBe("reading");
+    expect(listAlbums(db)[0].readStatus).toBe("reading");
+  });
+});
+
+describe("listAlbums filters", () => {
+  beforeEach(() => {
+    createAlbum(db, newAlbumSchema.parse({ ...rawTexasrakkers, readStatus: "read" }));
+    createAlbum(db, newAlbumSchema.parse({ seriesTitle: "Suske en Wiske", title: "De Zwarte Madam", number: "140", owned: "no" }));
+    createAlbum(db, newAlbumSchema.parse({ seriesTitle: "Kuifje", title: "De Blauwe Lotus", readStatus: "reading" }));
+  });
+
+  it("filters on owned", () => {
+    expect(listAlbums(db, { owned: "yes" }).map((a) => a.title).sort()).toEqual(["De Blauwe Lotus", "De Texasrakkers"]);
+    expect(listAlbums(db, { owned: "no" }).map((a) => a.title)).toEqual(["De Zwarte Madam"]);
+  });
+
+  it("filters on read status", () => {
+    expect(listAlbums(db, { readStatus: "read" }).map((a) => a.title)).toEqual(["De Texasrakkers"]);
+    expect(listAlbums(db, { readStatus: "unread" }).map((a) => a.title)).toEqual(["De Zwarte Madam"]);
+  });
+
+  it("combines filters with the text query", () => {
+    expect(listAlbums(db, { q: "wiske", owned: "yes" }).map((a) => a.title)).toEqual(["De Texasrakkers"]);
+    expect(listAlbums(db, { q: "wiske", readStatus: "reading" })).toHaveLength(0);
   });
 });
