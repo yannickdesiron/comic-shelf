@@ -92,21 +92,25 @@ src/
 scripts/               seed script
 drizzle/               generated SQL migrations
 data/                  local database and covers (git-ignored)
+docs/                  how the project is run: workflow and conventions
 ```
 
 ## Roadmap
 
-Tracked as [GitHub issues](https://github.com/yannickdesiron/comic-shelf/issues) under the
-[v0.2 milestone](https://github.com/yannickdesiron/comic-shelf/milestone/1). Rough order:
+Work is tracked on the ClickUp board (Space: Comic Shelf, List: Development),
+grouped under the v0.2 milestone. See [docs/workflow.md](docs/workflow.md) for
+how a task becomes a branch, a pull request and a merge.
 
-1. ~~Album detail page, edit and delete~~ (#1)
-2. ~~Ownership and read status~~ (#2)
-3. Filters: language, format, read status (#3)
-4. ISBN lookup to prefill metadata (#4)
-5. Barcode scanning on mobile (#5)
-6. Dutch and English UI toggle (#6)
-7. ~~Import from Excel or CSV~~ (#8)
-8. Custom lists (#10)
+Shipped so far: adding albums, the shelf with search, the album detail page
+with edit and delete, ownership and read status, and spreadsheet import.
+
+Next up, roughly in order:
+
+1. Filters: language, format, read status
+2. ISBN lookup to prefill metadata
+3. Barcode scanning on mobile
+4. Dutch and English UI toggle
+5. Custom lists
 
 ## License
 
