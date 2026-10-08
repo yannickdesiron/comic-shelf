@@ -45,3 +45,6 @@ next-env.d.ts
 !/data/covers/
 /data/covers/*
 !/data/covers/.gitkeep
+
+# local backups made by npm run db:backup
+/backups/
