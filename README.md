@@ -13,6 +13,7 @@ You can clone it and have it running in under a minute.
 - Browse your shelf, cover-first
 - Search across series, title, publisher and ISBN
 - Open an album, edit every field, replace the cover, or delete it
+- Import many albums at once from Excel or CSV, or by pasting rows from a spreadsheet, with a validation preview before anything is saved
 
 See the [roadmap](#roadmap) for what comes next.
 
@@ -24,6 +25,7 @@ See the [roadmap](#roadmap) for what comes next.
 | Database  | SQLite via better-sqlite3 + Drizzle ORM | Zero setup, a single file to back up, typed queries     |
 | Styling   | Tailwind CSS 4                          | Fast to iterate, dark mode for free                     |
 | Tests     | Vitest                                  | Domain logic runs against an in-memory SQLite database  |
+| Import    | SheetJS (xlsx)                          | Reads .xlsx and .csv server-side, no client bundle cost |
 
 ## Running it
 
@@ -78,9 +80,11 @@ src/
     albums/new/        add an album
     albums/[slug]/     album detail page, with edit/ below it
     covers/[file]/     serves uploaded cover images
+    import/            spreadsheet import: upload or paste, preview, confirm; template/ serves an .xlsx
   components/          shared UI
   db/                  Drizzle schema and SQLite client (runs migrations)
   lib/                 domain logic and helpers, with tests next to them
+                       (albums.ts: create/read/update/delete, import.ts: parse/validate/import)
 scripts/               seed script
 drizzle/               generated SQL migrations
 data/                  local database and covers (git-ignored)
@@ -97,6 +101,7 @@ Tracked as [GitHub issues](https://github.com/yannickdesiron/comic-shelf/issues)
 4. ISBN lookup to prefill metadata (#4)
 5. Barcode scanning on mobile (#5)
 6. Dutch and English UI toggle (#6)
+7. ~~Import from Excel or CSV~~ (#8)
 
 ## License
 
