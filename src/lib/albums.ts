@@ -2,7 +2,7 @@ import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Db } from "@/db/client";
-import { albums, copies, editions, series } from "@/db/schema";
+import { albums, copies, editions, series, type Album, type Copy, type Edition, type Series } from "@/db/schema";
 import { parseIsbn } from "@/lib/isbn";
 import { slugify } from "@/lib/slug";
 
@@ -176,4 +176,114 @@ export function listAlbums(db: Db, query = ""): ShelfAlbum[] {
     .all();
 
   return rows;
+}
+
+
+export type AlbumDetail = {
+  album: Album;
+  series: Series;
+  edition: Edition;
+  copy: Copy | null;
+};
+
+/** Full record for one album by slug, or null when it does not exist. */
+export function getAlbum(db: Db, slug: string): AlbumDetail | null {
+  const row = db
+    .select({ album: albums, series, edition: editions, copy: copies })
+    .from(albums)
+    .innerJoin(series, eq(series.id, albums.seriesId))
+    .innerJoin(editions, eq(editions.albumId, albums.id))
+    .leftJoin(copies, eq(copies.editionId, editions.id))
+    .where(eq(albums.slug, slug))
+    .orderBy(copies.id)
+    .get();
+  return row ?? null;
+}
+
+/**
+ * Updates an existing album, its edition and its copy. Moving the album to a
+ * different series creates that series when needed and removes the old one
+ * when it is left empty. The slug stays stable so links keep working.
+ * Returns the previous cover file when the cover changed, so the caller can
+ * delete it from disk.
+ */
+export function updateAlbum(db: Db, albumId: number, input: NewAlbum): { previousCover: string | null } {
+  return db.transaction((tx) => {
+    const current = tx.select().from(albums).where(eq(albums.id, albumId)).get();
+    if (!current) throw new Error(`Album ${albumId} not found`);
+
+    const seriesSlug = slugify(input.seriesTitle);
+    let seriesRow = tx.select().from(series).where(eq(series.slug, seriesSlug)).get();
+    if (!seriesRow) {
+      seriesRow = tx.insert(series).values({ title: input.seriesTitle, slug: seriesSlug }).returning().get();
+    }
+
+    tx.update(albums)
+      .set({ seriesId: seriesRow.id, title: input.title, number: input.number })
+      .where(eq(albums.id, albumId))
+      .run();
+
+    if (seriesRow.id !== current.seriesId) deleteSeriesIfEmpty(tx, current.seriesId);
+
+    const edition = tx.select().from(editions).where(eq(editions.albumId, albumId)).get();
+    if (!edition) throw new Error(`Album ${albumId} has no edition`);
+
+    const coverChanged = input.coverFile !== null && input.coverFile !== edition.coverFile;
+    tx.update(editions)
+      .set({
+        publisher: input.publisher,
+        year: input.year,
+        isbn: input.isbn,
+        language: input.language,
+        format: input.format,
+        coverFile: coverChanged ? input.coverFile : edition.coverFile,
+      })
+      .where(eq(editions.id, edition.id))
+      .run();
+
+    const copyValues = {
+      kind: input.kind,
+      readStatus: input.readStatus,
+      location: input.location,
+      notes: input.notes,
+    };
+    const copy = tx.select().from(copies).where(eq(copies.editionId, edition.id)).get();
+    if (copy) {
+      tx.update(copies).set(copyValues).where(eq(copies.id, copy.id)).run();
+    } else {
+      tx.insert(copies).values({ editionId: edition.id, ...copyValues }).run();
+    }
+
+    return { previousCover: coverChanged ? edition.coverFile : null };
+  });
+}
+
+/**
+ * Deletes an album. Editions and copies go with it through cascading foreign
+ * keys; an emptied series is removed too. Returns the cover files that are
+ * now orphaned so the caller can delete them from disk.
+ */
+export function deleteAlbum(db: Db, albumId: number): { coverFiles: string[] } {
+  return db.transaction((tx) => {
+    const current = tx.select().from(albums).where(eq(albums.id, albumId)).get();
+    if (!current) return { coverFiles: [] };
+
+    const coverFiles = tx
+      .select({ coverFile: editions.coverFile })
+      .from(editions)
+      .where(eq(editions.albumId, albumId))
+      .all()
+      .map((e) => e.coverFile)
+      .filter((f): f is string => f !== null);
+
+    tx.delete(albums).where(eq(albums.id, albumId)).run();
+    deleteSeriesIfEmpty(tx, current.seriesId);
+
+    return { coverFiles };
+  });
+}
+
+function deleteSeriesIfEmpty(db: Tx, seriesId: number) {
+  const remaining = db.select({ id: albums.id }).from(albums).where(eq(albums.seriesId, seriesId)).get();
+  if (!remaining) db.delete(series).where(eq(series.id, seriesId)).run();
 }

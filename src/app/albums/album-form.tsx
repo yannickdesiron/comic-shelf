@@ -2,17 +2,27 @@
 
 import { useActionState } from "react";
 
-import { createAlbumAction, type FormState } from "./actions";
+import { Cover } from "@/components/cover";
+import type { AlbumDetail } from "@/lib/albums";
+
+import type { FormState } from "./actions";
+
+type Props = {
+  action: (prev: FormState, formData: FormData) => Promise<FormState>;
+  album?: AlbumDetail;
+  submitLabel: string;
+};
 
 const initial: FormState = { errors: {}, values: {} };
 
-export function AlbumForm() {
-  const [state, action, pending] = useActionState(createAlbumAction, initial);
-  const v = state.values;
+/** Add and edit share this form; `album` prefills it for editing. */
+export function AlbumForm({ action, album, submitLabel }: Props) {
+  const [state, formAction, pending] = useActionState(action, initial);
+  const v = { ...(album ? toValues(album) : {}), ...state.values };
   const e = state.errors;
 
   return (
-    <form action={action} className="grid gap-5 sm:grid-cols-2">
+    <form action={formAction} className="grid gap-5 sm:grid-cols-2">
       <Field label="Reeks" name="seriesTitle" error={e.seriesTitle} required defaultValue={v.seriesTitle} placeholder="Suske en Wiske" />
       <Field label="Nummer" name="number" error={e.number} type="number" min={0} defaultValue={v.number} />
       <Field label="Titel" name="title" error={e.title} required defaultValue={v.title} placeholder="De Texasrakkers" className="sm:col-span-2" />
@@ -28,11 +38,23 @@ export function AlbumForm() {
       <Field label="Locatie" name="location" error={e.location} defaultValue={v.location} placeholder="Kast woonkamer, plank 2" />
       <Field label="Notities" name="notes" error={e.notes} defaultValue={v.notes} />
 
-      <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-        <span className="font-medium">Cover</span>
-        <input type="file" name="cover" accept="image/jpeg,image/png,image/webp" className="text-sm text-muted" />
-        <Hint text="JPG, PNG of WebP, maximaal 5 MB" error={e.cover} />
-      </label>
+      <div className="flex gap-4 sm:col-span-2">
+        {album?.edition.coverFile && (
+          <div className="w-24 shrink-0">
+            <Cover
+              coverFile={album.edition.coverFile}
+              title={album.album.title}
+              seriesTitle={album.series.title}
+              number={album.album.number}
+            />
+          </div>
+        )}
+        <label className="flex flex-1 flex-col gap-1 text-sm">
+          <span className="font-medium">{album?.edition.coverFile ? "Cover vervangen" : "Cover"}</span>
+          <input type="file" name="cover" accept="image/jpeg,image/png,image/webp" className="text-sm text-muted" />
+          <Hint text="JPG, PNG of WebP, maximaal 5 MB" error={e.cover} />
+        </label>
+      </div>
 
       {e.form && <p className="text-sm text-accent sm:col-span-2">{e.form}</p>}
 
@@ -42,11 +64,28 @@ export function AlbumForm() {
           disabled={pending}
           className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Opslaan…" : "Album opslaan"}
+          {pending ? "Opslaan…" : submitLabel}
         </button>
       </div>
     </form>
   );
+}
+
+function toValues({ album, series, edition, copy }: AlbumDetail): Record<string, string> {
+  return {
+    seriesTitle: series.title,
+    title: album.title,
+    number: album.number?.toString() ?? "",
+    publisher: edition.publisher ?? "",
+    year: edition.year?.toString() ?? "",
+    isbn: edition.isbn ?? "",
+    language: edition.language,
+    format: edition.format,
+    kind: copy?.kind ?? "physical",
+    readStatus: copy?.readStatus ?? "unread",
+    location: copy?.location ?? "",
+    notes: copy?.notes ?? "",
+  };
 }
 
 type FieldProps = React.InputHTMLAttributes<HTMLInputElement> & {

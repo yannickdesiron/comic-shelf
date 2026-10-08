@@ -9,3 +9,9 @@ export function coversDir(): string {
 export function coverPath(file: string): string {
   return path.join(/*turbopackIgnore: true*/ coversDir(), file);
 }
+
+/** Deletes a cover file if it exists. Missing files are not an error. */
+export async function removeCover(file: string): Promise<void> {
+  const fs = await import("node:fs/promises");
+  await fs.rm(/*turbopackIgnore: true*/ coverPath(file), { force: true });
+}
