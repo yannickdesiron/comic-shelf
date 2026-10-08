@@ -48,12 +48,14 @@ Backup written to /…/backups/2026-10-08_182059
 ```
 
 If the row counts look wrong, stop and investigate before you overwrite
-anything.
+anything. If the database is not where the script looks, it stops with an error
+rather than quietly backing up an empty one somewhere else.
 
 ### Where it reads from and writes to
 
 The script follows the same environment variables as the app, so it backs up
-whichever database the app is actually using:
+whichever database the app is actually using. It reads them from `.env` in the
+project root, the same file the app reads, so there is one place to set them:
 
 | Variable | Default |
 | --- | --- |
