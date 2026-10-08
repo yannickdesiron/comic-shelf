@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Cover } from "@/components/cover";
 import type { AlbumDetail } from "@/lib/albums";
@@ -20,6 +20,7 @@ export function AlbumForm({ action, album, submitLabel }: Props) {
   const [state, formAction, pending] = useActionState(action, initial);
   const v = { ...(album ? toValues(album) : {}), ...state.values };
   const e = state.errors;
+  const [owned, setOwned] = useState((v.owned ?? "yes") === "yes");
 
   return (
     <form action={formAction} className="grid gap-5 sm:grid-cols-2">
@@ -32,11 +33,28 @@ export function AlbumForm({ action, album, submitLabel }: Props) {
 
       <Select label="Taal" name="language" defaultValue={v.language ?? "nl"} options={[["nl", "Nederlands"], ["fr", "Frans"], ["en", "Engels"]]} />
       <Select label="Uitvoering" name="format" defaultValue={v.format ?? "softcover"} options={[["softcover", "Softcover"], ["hardcover", "Hardcover"], ["digital", "Digitaal"]]} />
-      <Select label="Exemplaar" name="kind" defaultValue={v.kind ?? "physical"} options={[["physical", "Fysiek"], ["digital", "Digitaal"]]} />
       <Select label="Gelezen" name="readStatus" defaultValue={v.readStatus ?? "unread"} options={[["unread", "Nog niet"], ["reading", "Bezig"], ["read", "Gelezen"]]} />
 
-      <Field label="Locatie" name="location" error={e.location} defaultValue={v.location} placeholder="Kast woonkamer, plank 2" />
-      <Field label="Notities" name="notes" error={e.notes} defaultValue={v.notes} />
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium">In bezit</span>
+        <select
+          name="owned"
+          value={owned ? "yes" : "no"}
+          onChange={(ev) => setOwned(ev.target.value === "yes")}
+          className="rounded-md border border-line bg-card px-3 py-2 outline-none focus:border-accent"
+        >
+          <option value="yes">Ja, ik heb dit album</option>
+          <option value="no">Nee, nog gezocht</option>
+        </select>
+      </label>
+
+      {owned && (
+        <>
+          <Select label="Exemplaar" name="kind" defaultValue={v.kind ?? "physical"} options={[["physical", "Fysiek"], ["digital", "Digitaal"]]} />
+          <Field label="Locatie" name="location" error={e.location} defaultValue={v.location} placeholder="Kast woonkamer, plank 2" />
+          <Field label="Notities" name="notes" error={e.notes} defaultValue={v.notes} className="sm:col-span-2" />
+        </>
+      )}
 
       <div className="flex gap-4 sm:col-span-2">
         {album?.edition.coverFile && (
@@ -81,8 +99,9 @@ function toValues({ album, series, edition, copy }: AlbumDetail): Record<string,
     isbn: edition.isbn ?? "",
     language: edition.language,
     format: edition.format,
+    readStatus: album.readStatus,
+    owned: copy ? "yes" : "no",
     kind: copy?.kind ?? "physical",
-    readStatus: copy?.readStatus ?? "unread",
     location: copy?.location ?? "",
     notes: copy?.notes ?? "",
   };

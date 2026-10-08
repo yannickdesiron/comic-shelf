@@ -24,6 +24,7 @@ export const COLUMNS: { field: Field; label: string; aliases: string[]; example:
   { field: "language", label: "Taal", aliases: ["taal", "language", "lang"], example: "Nederlands" },
   { field: "format", label: "Uitvoering", aliases: ["uitvoering", "format", "band", "binding"], example: "Softcover" },
   { field: "kind", label: "Soort", aliases: ["soort", "kind", "type", "exemplaar"], example: "Fysiek" },
+  { field: "owned", label: "In bezit", aliases: ["in bezit", "bezit", "owned", "eigendom", "heb ik"], example: "Ja" },
   { field: "readStatus", label: "Gelezen", aliases: ["gelezen", "leesstatus", "status", "read"], example: "Ja" },
   { field: "location", label: "Locatie", aliases: ["locatie", "location", "plaats", "kast"], example: "Kast woonkamer, plank 1" },
   { field: "notes", label: "Notities", aliases: ["notities", "notes", "opmerkingen", "opmerking"], example: "" },
@@ -33,6 +34,7 @@ const ENUM_WORDS: Partial<Record<Field, Record<string, string>>> = {
   language: { nl: "nl", nederlands: "nl", dutch: "nl", fr: "fr", frans: "fr", français: "fr", francais: "fr", french: "fr", en: "en", engels: "en", english: "en" },
   format: { softcover: "softcover", sc: "softcover", zacht: "softcover", zachte: "softcover", paperback: "softcover", hardcover: "hardcover", hc: "hardcover", hard: "hardcover", harde: "hardcover", digitaal: "digital", digital: "digital", pdf: "digital" },
   kind: { fysiek: "physical", physical: "physical", papier: "physical", boek: "physical", digitaal: "digital", digital: "digital" },
+  owned: { ja: "yes", yes: "yes", x: "yes", "in bezit": "yes", bezit: "yes", owned: "yes", nee: "no", no: "no", gezocht: "no", wanted: "no", "niet in bezit": "no" },
   readStatus: { gelezen: "read", read: "read", ja: "read", yes: "read", x: "read", bezig: "reading", reading: "reading", "nog niet": "unread", "niet gelezen": "unread", unread: "unread", nee: "unread", no: "unread" },
 };
 

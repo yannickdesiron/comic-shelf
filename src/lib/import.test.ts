@@ -33,6 +33,11 @@ describe("parseSpreadsheet", () => {
     expect(sheet.unknownHeaders).toEqual(["Prijs"]);
   });
 
+  it("maps the In bezit column", () => {
+    const rows = validateRows(parseSpreadsheet("Reeks,Titel,In bezit\nNero,Matsuoka,nee\nNero,Toto,ja\n").rows);
+    expect(rows.map((r) => r.ok && r.data.owned)).toEqual(["no", "yes"]);
+  });
+
   it("reads a csv string", () => {
     const sheet = parseSpreadsheet("Reeks,Titel,Nummer\nJommeke,De Jacht op een Voetbal,1\n");
     expect(sheet.rows).toEqual([{ row: 2, values: { seriesTitle: "Jommeke", title: "De Jacht op een Voetbal", number: "1" } }]);
@@ -102,7 +107,7 @@ describe("importAlbums", () => {
 describe("buildTemplate", () => {
   it("produces an xlsx whose headers parse back to every field", () => {
     const sheet = parseSpreadsheet(buildTemplate());
-    expect(sheet.fields).toHaveLength(12);
+    expect(sheet.fields).toHaveLength(13);
     expect(sheet.unknownHeaders).toEqual([]);
     const [row] = validateRows(sheet.rows);
     expect(row.ok).toBe(true);

@@ -2,17 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Cover } from "@/components/cover";
+import { ReadStatusControl } from "@/components/read-status";
 import { getDb } from "@/db/client";
 import { getAlbum } from "@/lib/albums";
 
 import { deleteAlbumAction } from "../actions";
 import { DeleteButton } from "./delete-button";
+import { OwnedButton } from "./owned-button";
 
 const LABELS = {
   language: { nl: "Nederlands", fr: "Frans", en: "Engels" },
   format: { softcover: "Softcover", hardcover: "Hardcover", digital: "Digitaal" },
   kind: { physical: "Fysiek", digital: "Digitaal" },
-  readStatus: { unread: "Nog niet gelezen", reading: "Bezig", read: "Gelezen" },
 } as const;
 
 export async function generateMetadata({ params }: PageProps<"/albums/[slug]">) {
@@ -44,6 +45,12 @@ export default async function AlbumPage({ params }: PageProps<"/albums/[slug]">)
             {album.number !== null && <> · nummer {album.number}</>}
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">{album.title}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <ReadStatusControl slug={slug} status={album.readStatus} variant="segmented" />
+            {!copy && (
+              <span className="rounded-full border border-accent px-2.5 py-0.5 text-xs font-medium text-accent">Gezocht</span>
+            )}
+          </div>
         </header>
 
         <section>
@@ -61,14 +68,20 @@ export default async function AlbumPage({ params }: PageProps<"/albums/[slug]">)
 
         <section>
           <h2 className="mb-2 text-xs font-medium uppercase tracking-widest text-muted">Mijn exemplaar</h2>
-          <Facts
-            rows={[
-              ["Soort", copy ? LABELS.kind[copy.kind] : null],
-              ["Status", copy ? LABELS.readStatus[copy.readStatus] : null],
-              ["Locatie", copy?.location],
-              ["Notities", copy?.notes],
-            ]}
-          />
+          {copy ? (
+            <Facts
+              rows={[
+                ["Soort", LABELS.kind[copy.kind]],
+                ["Locatie", copy.location],
+                ["Notities", copy.notes],
+              ]}
+            />
+          ) : (
+            <p className="text-sm text-muted">Je hebt dit album nog niet.</p>
+          )}
+          <div className="mt-3">
+            <OwnedButton slug={slug} owned={Boolean(copy)} />
+          </div>
         </section>
 
         <footer className="flex items-center gap-3 border-t border-line pt-4">

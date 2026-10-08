@@ -8,6 +8,13 @@
       "when": 1789243753988,
       "tag": "0000_little_saracen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789385986525,
+      "tag": "0001_read-status-on-albums",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getDb } from "@/db/client";
-import { createAlbum, deleteAlbum, getAlbum, newAlbumSchema, updateAlbum, type NewAlbum } from "@/lib/albums";
+import {
+  createAlbum,
+  deleteAlbum,
+  getAlbum,
+  newAlbumSchema,
+  setOwned,
+  setReadStatus,
+  updateAlbum,
+  type NewAlbum,
+  type ReadStatus,
+} from "@/lib/albums";
 import { coverPath, coversDir, removeCover } from "@/lib/storage";
 
 export type FormState = {
@@ -93,4 +103,22 @@ export async function deleteAlbumAction(slug: string): Promise<void> {
 
   revalidatePath("/");
   redirect("/");
+}
+
+export async function setReadStatusAction(slug: string, status: ReadStatus): Promise<void> {
+  const db = getDb();
+  const detail = getAlbum(db, slug);
+  if (!detail) return;
+  setReadStatus(db, detail.album.id, status);
+  revalidatePath("/");
+  revalidatePath(`/albums/${slug}`);
+}
+
+export async function setOwnedAction(slug: string, owned: boolean): Promise<void> {
+  const db = getDb();
+  const detail = getAlbum(db, slug);
+  if (!detail) return;
+  setOwned(db, detail.album.id, owned);
+  revalidatePath("/");
+  revalidatePath(`/albums/${slug}`);
 }
