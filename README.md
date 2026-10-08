@@ -46,10 +46,29 @@ covers land in `data/covers/`. Both are ignored by git.
 
 Copy `.env.example` to `.env` if you want to change those paths.
 
+## Backups
+
+Your collection lives in two places: the SQLite database and the covers folder.
+
+```bash
+npm run db:backup
+```
+
+This writes a timestamped, self-contained copy of both into `backups/`, and
+counts the rows afterwards so an empty backup fails loudly instead of quietly.
+
+Do not back up by copying `data/comic-shelf.db` on its own. The database runs
+in WAL mode, so recent writes sit in a `-wal` file beside it; on a fresh
+database a copy of the `.db` file alone can contain no tables at all.
+
+See [docs/backup.md](docs/backup.md) for restoring, running it on a schedule,
+and why you should test a restore once before your collection gets large.
+
 ## Development
 
 ```bash
 npm run db:seed     # fill an empty database with 18 classic albums and generated covers
+npm run db:backup   # verified backup of the database and covers into backups/
 npm test            # unit tests (Vitest)
 npm run lint        # ESLint
 npm run typecheck   # Next.js route types + tsc
@@ -92,7 +111,7 @@ src/
 scripts/               seed script
 drizzle/               generated SQL migrations
 data/                  local database and covers (git-ignored)
-docs/                  how the project is run: workflow and conventions
+docs/                  how the project is run: workflow, backups, conventions
 ```
 
 ## Roadmap

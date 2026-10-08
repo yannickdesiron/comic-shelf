@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# but the template must ship: the README tells you to copy it
+!.env.example
 
 # vercel
 .vercel
@@ -45,3 +47,6 @@ next-env.d.ts
 !/data/covers/
 /data/covers/*
 !/data/covers/.gitkeep
+
+# local backups made by npm run db:backup
+/backups/
