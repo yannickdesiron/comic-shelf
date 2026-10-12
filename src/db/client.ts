@@ -4,6 +4,8 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import fs from "node:fs";
 import path from "node:path";
 
+import { foldText } from "@/lib/search";
+
 import * as schema from "./schema";
 
 export type Db = ReturnType<typeof createDb>;
@@ -19,6 +21,12 @@ export function createDb(file: string) {
   const sqlite = new Database(file);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
+
+  // Lets the shelf search compare text without case or diacritics, which
+  // SQLite's LIKE cannot do on its own. See src/lib/search.ts.
+  sqlite.function("unaccent", { deterministic: true }, (value) =>
+    typeof value === "string" ? foldText(value) : (value ?? null),
+  );
 
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });

@@ -1,9 +1,11 @@
 import { and, desc, eq, exists, isNull, like, not, or, sql } from "drizzle-orm";
+import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 import { z } from "zod";
 
 import type { Db } from "@/db/client";
 import { albums, copies, editions, series, type Album, type Copy, type Edition, type Series } from "@/db/schema";
 import { parseIsbn } from "@/lib/isbn";
+import { isbnFragment, likePattern } from "@/lib/search";
 import { slugify } from "@/lib/slug";
 
 const currentYear = new Date().getFullYear();
@@ -152,17 +154,24 @@ export type ShelfFilters = {
 export function listAlbums(db: Db, filters: ShelfFilters | string = {}): ShelfAlbum[] {
   const f = typeof filters === "string" ? { q: filters } : filters;
   const q = f.q?.trim() ?? "";
-  const pattern = `%${q}%`;
+  const pattern = likePattern(q);
+
+  /** Compares a column to the query with both sides folded, wildcards escaped. */
+  const matches = (column: SQLiteColumn) => sql`unaccent(${column}) like ${pattern} escape '\\'`;
+
+  // An ISBN is stored without separators; the one printed on the album has them.
+  const isbn = isbnFragment(q);
 
   const hasCopy = exists(db.select({ id: copies.id }).from(copies).where(eq(copies.editionId, editions.id)));
 
   const conditions = [
     q.length > 0
       ? or(
-          like(series.title, pattern),
-          like(albums.title, pattern),
-          like(editions.publisher, pattern),
-          like(editions.isbn, pattern),
+          matches(series.title),
+          matches(albums.title),
+          matches(editions.publisher),
+          matches(editions.isbn),
+          isbn ? like(editions.isbn, `%${isbn}%`) : undefined,
         )
       : undefined,
     f.owned === "yes" ? hasCopy : f.owned === "no" ? not(hasCopy) : undefined,

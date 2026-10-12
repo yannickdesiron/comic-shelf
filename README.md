@@ -11,7 +11,8 @@ You can clone it and have it running in under a minute.
 
 - Add an album with series, number, publisher, year, ISBN and a cover image
 - Browse your shelf, cover-first
-- Search across series, title, publisher and ISBN
+- Search across series, title, publisher and ISBN, ignoring case and accents,
+  so "leonard" finds Léonard and an ISBN matches with or without its hyphens
 - Open an album, edit every field, replace the cover, or delete it
 - Mark albums as owned or wanted, and track read status per story; toggle both without opening the edit form
 - Filter the shelf on ownership and read status, combined with the search
